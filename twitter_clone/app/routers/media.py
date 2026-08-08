@@ -1,58 +1,36 @@
-from pathlib import Path
-from uuid import uuid4
-
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import models
+from .. import models, schemas
 from ..auth import get_current_user
 from ..dependencies import get_db_session
+from ..services import media_service
 
 router = APIRouter()
 
-MEDIA_DIR = Path("app/media")
-MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-
-@router.post("")
+@router.post(
+    "",
+    response_model=schemas.MediaResponse,
+    status_code=201,
+)
 def upload_media(
     file: UploadFile = File(...),
     db: Session = Depends(get_db_session),
     current_user: models.User = Depends(get_current_user),
-) -> dict:
-    allowed_types = {
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-    }
+) -> schemas.MediaResponse:
+    try:
+        media = media_service.save_media(
+            db=db,
+            file=file,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
 
-    if file.content_type not in allowed_types:
-        return {
-            "result": False,
-            "error_type": "ValidationError",
-            "error_message": "Only image files are allowed",
-        }
-
-    original_name = file.filename or "image"
-    extension = Path(original_name).suffix
-    stored_name = f"{uuid4().hex}{extension}"
-    file_path = MEDIA_DIR / stored_name
-
-    with file_path.open("wb") as output:
-        output.write(file.file.read())
-
-    media = models.Media(
-        filename=stored_name,
-        file_path=str(file_path),
-        content_type=file.content_type,
+    return schemas.MediaResponse(
+        result=True,
+        media_id=media.id,
     )
-
-    db.add(media)
-    db.commit()
-    db.refresh(media)
-
-    return {
-        "result": True,
-        "media_id": media.id,
-    }

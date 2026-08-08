@@ -20,6 +20,6 @@ RUN pip install \
 
 COPY . .
 
-RUN mkdir -p app/media
+RUN mkdir -p /app/app/media
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

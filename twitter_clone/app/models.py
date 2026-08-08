@@ -69,7 +69,11 @@ class Tweet(Base):
     id = Column(Integer, primary_key=True, index=True)
     tweet_data = Column(Text, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
     author = relationship("User", back_populates="tweets")
 
@@ -93,7 +97,11 @@ class Media(Base):
     filename = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
     content_type = Column(String(100), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
     tweets = relationship(
         "Tweet",
@@ -115,7 +123,11 @@ class Like(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     tweet_id = Column(Integer, ForeignKey("tweets.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
     user = relationship("User", back_populates="likes")
     tweet = relationship("Tweet", back_populates="likes")
@@ -134,7 +146,11 @@ class Follow(Base):
     id = Column(Integer, primary_key=True, index=True)
     follower_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     following_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
     follower = relationship(
         "User",

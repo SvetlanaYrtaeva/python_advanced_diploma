@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -12,12 +13,21 @@ from .routers.tweets import router as tweets_router
 from .routers.users import router as users_router
 from .seed import seed_users
 
+MEDIA_DIRECTORY = Path("app/media")
+STATIC_DIRECTORY = Path("app/static")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    MEDIA_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
+
     try:
         seed_users(db)
     finally:
@@ -53,13 +63,13 @@ app.include_router(
 
 app.mount(
     "/static",
-    StaticFiles(directory="app/static"),
+    StaticFiles(directory=str(STATIC_DIRECTORY)),
     name="static",
 )
 
 app.mount(
     "/media",
-    StaticFiles(directory="app/media"),
+    StaticFiles(directory=str(MEDIA_DIRECTORY)),
     name="media",
 )
 
@@ -68,7 +78,7 @@ app.mount(
 async def http_exception_handler(
     request: Request,
     exc: StarletteHTTPException,
-):
+) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -83,17 +93,17 @@ async def http_exception_handler(
 async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
-):
+) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={
             "result": False,
             "error_type": "ValidationError",
-            "error_message": str(exc.errors()),
+            "error_message": "Invalid request data",
         },
     )
 
 
 @app.get("/", include_in_schema=False)
-def serve_index():
+def serve_index() -> FileResponse:
     return FileResponse("app/static/index.html")
