@@ -13,8 +13,8 @@ from .routers.tweets import router as tweets_router
 from .routers.users import router as users_router
 from .seed import seed_users
 
-MEDIA_DIRECTORY = Path("app/media")
 STATIC_DIRECTORY = Path("app/static")
+MEDIA_DIRECTORY = Path("app/media")
 
 
 @asynccontextmanager
@@ -68,6 +68,18 @@ app.mount(
 )
 
 app.mount(
+    "/css",
+    StaticFiles(directory=str(STATIC_DIRECTORY / "css")),
+    name="css",
+)
+
+app.mount(
+    "/js",
+    StaticFiles(directory=str(STATIC_DIRECTORY / "js")),
+    name="js",
+)
+
+app.mount(
     "/media",
     StaticFiles(directory=str(MEDIA_DIRECTORY)),
     name="media",
@@ -104,6 +116,9 @@ async def validation_exception_handler(
     )
 
 
-@app.get("/", include_in_schema=False)
+@app.get(
+    "/",
+    include_in_schema=False,
+)
 def serve_index() -> FileResponse:
     return FileResponse("app/static/index.html")
