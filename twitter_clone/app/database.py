@@ -21,6 +21,7 @@ Base = declarative_base()
 
 def get_db() -> Generator:
     db = SessionLocal()
+
     try:
         yield db
     finally:

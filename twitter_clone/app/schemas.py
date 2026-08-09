@@ -19,11 +19,6 @@ class OperationResponse(BaseModel):
     result: bool
 
 
-class MediaResponse(BaseModel):
-    result: bool
-    media_id: int
-
-
 class UserShortResponse(BaseModel):
     id: int
     name: str
@@ -34,11 +29,6 @@ class UserShortResponse(BaseModel):
 class LikeResponse(BaseModel):
     user_id: int
     name: str
-
-
-class AttachmentResponse(BaseModel):
-    id: int
-    url: str
 
 
 class TweetFeedResponse(BaseModel):
@@ -64,6 +54,11 @@ class ProfileResponse(BaseModel):
 class UserResponse(BaseModel):
     result: bool
     user: ProfileResponse
+
+
+class MediaResponse(BaseModel):
+    result: bool
+    media_id: int
 
 
 class ErrorResponse(BaseModel):

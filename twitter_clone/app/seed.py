@@ -21,9 +21,7 @@ def seed_users(db: Session) -> None:
 
     for user in users:
         existing_user = (
-            db.query(models.User)
-            .filter(models.User.api_key == user.api_key)
-            .first()
+            db.query(models.User).filter(models.User.api_key == user.api_key).first()
         )
 
         if existing_user is None:

@@ -1,1 +1,11 @@
-/.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.env
+app/media/*
+!app/media/.gitkeep

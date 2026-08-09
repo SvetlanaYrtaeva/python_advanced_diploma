@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.database import Base, engine
 from app.dependencies import get_db_session
 from app.main import app
-from app.models import User
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -38,16 +37,3 @@ def client(db_session: Session) -> TestClient:
         yield test_client
 
     app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def users(db_session: Session) -> tuple[User, User]:
-    alice = User(name="Alice", api_key="alice-test-key")
-    bob = User(name="Bob", api_key="bob-test-key")
-
-    db_session.add_all([alice, bob])
-    db_session.commit()
-    db_session.refresh(alice)
-    db_session.refresh(bob)
-
-    return alice, bob

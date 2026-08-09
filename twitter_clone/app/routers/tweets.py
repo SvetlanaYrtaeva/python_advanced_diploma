@@ -1,11 +1,10 @@
-from collections import defaultdict
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from .. import models, schemas
 from ..auth import get_current_user
 from ..dependencies import get_db_session
+from ..services import tweet_service
 
 router = APIRouter()
 
@@ -13,39 +12,25 @@ router = APIRouter()
 @router.post(
     "",
     response_model=schemas.CreateTweetResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=201,
 )
 def create_tweet(
     payload: schemas.TweetCreate,
     db: Session = Depends(get_db_session),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.CreateTweetResponse:
-    media_objects = []
-
-    if payload.tweet_media_ids:
-        unique_media_ids = set(payload.tweet_media_ids)
-
-        media_objects = (
-            db.query(models.Media)
-            .filter(models.Media.id.in_(unique_media_ids))
-            .all()
+    try:
+        tweet = tweet_service.create_tweet(
+            db=db,
+            user=current_user,
+            tweet_data=payload.tweet_data,
+            media_ids=payload.tweet_media_ids,
         )
-
-        if len(media_objects) != len(unique_media_ids):
-            raise HTTPException(
-                status_code=400,
-                detail="One or more media files do not exist",
-            )
-
-    tweet = models.Tweet(
-        tweet_data=payload.tweet_data,
-        user_id=current_user.id,
-        media=media_objects,
-    )
-
-    db.add(tweet)
-    db.commit()
-    db.refresh(tweet)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
 
     return schemas.CreateTweetResponse(
         result=True,
@@ -62,26 +47,22 @@ def delete_tweet(
     db: Session = Depends(get_db_session),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.OperationResponse:
-    tweet = (
-        db.query(models.Tweet)
-        .filter(models.Tweet.id == tweet_id)
-        .first()
-    )
-
-    if tweet is None:
+    try:
+        tweet_service.delete_tweet(
+            db=db,
+            tweet_id=tweet_id,
+            user=current_user,
+        )
+    except LookupError as error:
         raise HTTPException(
             status_code=404,
-            detail="Tweet not found",
-        )
-
-    if tweet.user_id != current_user.id:
+            detail=str(error),
+        ) from error
+    except PermissionError as error:
         raise HTTPException(
             status_code=403,
-            detail="You can delete only your own tweet",
-        )
-
-    db.delete(tweet)
-    db.commit()
+            detail=str(error),
+        ) from error
 
     return schemas.OperationResponse(result=True)
 
@@ -95,40 +76,22 @@ def like_tweet(
     db: Session = Depends(get_db_session),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.OperationResponse:
-    tweet = (
-        db.query(models.Tweet)
-        .filter(models.Tweet.id == tweet_id)
-        .first()
-    )
-
-    if tweet is None:
+    try:
+        tweet_service.like_tweet(
+            db=db,
+            tweet_id=tweet_id,
+            user=current_user,
+        )
+    except LookupError as error:
         raise HTTPException(
             status_code=404,
-            detail="Tweet not found",
-        )
-
-    existing_like = (
-        db.query(models.Like)
-        .filter(
-            models.Like.tweet_id == tweet_id,
-            models.Like.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if existing_like is not None:
+            detail=str(error),
+        ) from error
+    except ValueError as error:
         raise HTTPException(
             status_code=400,
-            detail="Tweet already liked",
-        )
-
-    db.add(
-        models.Like(
-            tweet_id=tweet_id,
-            user_id=current_user.id,
-        )
-    )
-    db.commit()
+            detail=str(error),
+        ) from error
 
     return schemas.OperationResponse(result=True)
 
@@ -142,23 +105,17 @@ def unlike_tweet(
     db: Session = Depends(get_db_session),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.OperationResponse:
-    like = (
-        db.query(models.Like)
-        .filter(
-            models.Like.tweet_id == tweet_id,
-            models.Like.user_id == current_user.id,
+    try:
+        tweet_service.unlike_tweet(
+            db=db,
+            tweet_id=tweet_id,
+            user=current_user,
         )
-        .first()
-    )
-
-    if like is None:
+    except LookupError as error:
         raise HTTPException(
             status_code=404,
-            detail="Like not found",
-        )
-
-    db.delete(like)
-    db.commit()
+            detail=str(error),
+        ) from error
 
     return schemas.OperationResponse(result=True)
 
@@ -171,55 +128,30 @@ def get_feed(
     db: Session = Depends(get_db_session),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.FeedResponse:
-    following_ids_query = (
-        db.query(models.Follow.following_id)
-        .filter(models.Follow.follower_id == current_user.id)
-    )
-
-    tweets_with_likes = (
-        db.query(
-            models.Tweet,
-            func.count(models.Like.id).label("likes_count"),
-        )
-        .outerjoin(
-            models.Like,
-            models.Like.tweet_id == models.Tweet.id,
-        )
-        .filter(models.Tweet.user_id.in_(following_ids_query))
-        .group_by(models.Tweet.id)
-        .order_by(
-            func.count(models.Like.id).desc(),
-            models.Tweet.created_at.desc(),
-        )
-        .all()
+    tweets = tweet_service.get_feed(
+        db=db,
+        user=current_user,
     )
 
     result = []
 
-    for tweet, _likes_count in tweets_with_likes:
-        likes = [
-            {
-                "user_id": like.user_id,
-                "name": like.user.name,
-            }
-            for like in tweet.likes
-        ]
-
-        attachments = [
-            f"/media/{media.filename}"
-            for media in tweet.media
-        ]
-
+    for tweet in tweets:
         result.append(
             schemas.TweetFeedResponse(
                 id=tweet.id,
                 content=tweet.tweet_data,
-                attachments=attachments,
+                attachments=[f"/media/{media.filename}" for media in tweet.media],
                 author=schemas.UserShortResponse(
                     id=tweet.author.id,
                     name=tweet.author.name,
                 ),
-                likes=likes,
+                likes=[
+                    schemas.LikeResponse(
+                        user_id=like.user_id,
+                        name=like.user.name,
+                    )
+                    for like in tweet.likes
+                ],
             )
         )
 
