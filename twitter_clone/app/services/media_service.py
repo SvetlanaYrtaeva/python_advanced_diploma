@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from .. import models
 
-
 MEDIA_DIR = Path("app/media")
 
 ALLOWED_CONTENT_TYPES = {

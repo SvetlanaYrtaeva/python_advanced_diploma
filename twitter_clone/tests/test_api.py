@@ -23,6 +23,7 @@ def test_upload_avif_media(client: TestClient):
     assert data["result"] is True
     assert isinstance(data["media_id"], int)
 
+
 def test_get_my_profile(client: TestClient):
     response = client.get(
         "/api/users/me",
@@ -186,3 +187,64 @@ def test_following_feed(client: TestClient):
 
     assert data["result"] is True
     assert isinstance(data["tweets"], list)
+
+
+def test_request_without_api_key(client: TestClient):
+    response = client.get("/api/users/me")
+
+    assert response.status_code == 401
+    assert response.json()["result"] is False
+
+
+def test_duplicate_like(client: TestClient):
+    create_response = client.post(
+        "/api/tweets",
+        headers={"api-key": "alice-key"},
+        json={
+            "tweet_data": "Tweet for duplicate like",
+            "tweet_media_ids": [],
+        },
+    )
+
+    tweet_id = create_response.json()["tweet_id"]
+
+    first_like = client.post(
+        f"/api/tweets/{tweet_id}/likes",
+        headers={"api-key": "bob-key"},
+    )
+
+    second_like = client.post(
+        f"/api/tweets/{tweet_id}/likes",
+        headers={"api-key": "bob-key"},
+    )
+
+    assert first_like.status_code == 200
+    assert second_like.status_code == 400
+    assert second_like.json()["result"] is False
+
+
+def test_user_cannot_follow_himself(client: TestClient):
+    response = client.post(
+        "/api/users/1/follow",
+        headers={"api-key": "alice-key"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["result"] is False
+
+
+def test_invalid_media_type(client: TestClient):
+    response = client.post(
+        "/api/medias",
+        headers={"api-key": "alice-key"},
+        files={
+            "file": (
+                "document.txt",
+                BytesIO(b"not an image"),
+                "text/plain",
+            ),
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["result"] is False
